@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+<meta charset="UTF-8">
+<script>
+// Sin código validado no se entra al panel ni se pide ningún dato.
+if (sessionStorage.getItem('vsku_auth') !== 'true') {
+  window.location.replace('index.html');
+}
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Ventas por SKU — GEMCO</title>
+<link rel="stylesheet" href="css/panel.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-izq">
+    <h1>Ventas por SKU <span>GEMCO</span></h1>
+    <div class="corte" id="corte"></div>
+  </div>
+  <div class="top-der">
+    <div class="seg" id="seg-monto" role="group" aria-label="Unidad de los montos">
+      <button type="button" data-mm="0" class="on" title="Pesos, sin decimales">CLP</button>
+      <button type="button" data-mm="1" title="Millones de pesos, con 1 decimal">MM$</button>
+    </div>
+    <span class="usuario" id="usuario"></span>
+    <button type="button" class="btn-sec" id="btn-salir">Salir</button>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Vistas">
+  <button type="button" data-vista="explorador" class="on" aria-current="page">Explorador por SKU</button>
+  <button type="button" data-vista="cliente">Por cliente</button>
+  <button type="button" data-vista="resumen">Resumen por línea</button>
+</nav>
+
+<section class="filtros" id="filtros" hidden aria-label="Filtros">
+  <div class="f-principal">
+    <input type="search" id="f-q" placeholder="Buscar SKU, descripción, familia, marca…" aria-label="Buscar" autocomplete="off">
+    <button type="button" class="btn-sec" id="btn-filtros" aria-expanded="false">Filtros</button>
+  </div>
+  <div class="f-extra">
+    <div class="seg" id="f-anio" role="group" aria-label="Año"></div>
+    <select id="f-linea" aria-label="Línea"></select>
+    <select id="f-familia" aria-label="Familia"></select>
+    <select id="f-marca" aria-label="Marca"></select>
+    <select id="f-origen" aria-label="Origen"></select>
+    <div class="f-cli">
+      <input type="text" id="f-cliente" list="lista-clientes" placeholder="Cliente…" aria-label="Cliente" autocomplete="off">
+      <button type="button" id="cli-x" aria-label="Quitar cliente" hidden>×</button>
+      <datalist id="lista-clientes"></datalist>
+      <div class="ayuda" id="cli-ayuda" hidden>Elige un cliente de la lista</div>
+    </div>
+    <label class="interruptor"><input type="checkbox" id="f-glosas" checked><span class="pista"></span>Incluir glosas sin detalle</label>
+    <button type="button" class="btn-link" id="btn-limpiar" disabled>Limpiar filtros</button>
+  </div>
+</section>
+
+<main>
+  <div class="estado" id="estado">Cargando datos…</div>
+
+  <div id="contenido" hidden>
+    <div class="kpis" id="kpis"></div>
+
+    <!-- Vista 1: Explorador por SKU -->
+    <div id="vista-explorador">
+      <div class="barra-tabla">
+        <div class="conteo" id="conteo"></div>
+        <button type="button" class="btn-sec" id="btn-csv" title="Descarga todo lo filtrado (se abre en Excel)">Exportar CSV</button>
+      </div>
+      <div class="tabla-wrap">
+        <table id="tabla" class="t-sku"><thead></thead><tbody></tbody></table>
+      </div>
+      <div class="paginacion" id="paginacion"></div>
+    </div>
+
+    <!-- Vista 2: Por cliente -->
+    <div id="vista-cliente" hidden>
+      <div id="cli-lista">
+        <div class="barra-tabla">
+          <input type="search" id="cli-q" placeholder="Buscar cliente por nombre…" aria-label="Buscar cliente por nombre" autocomplete="off">
+          <div class="conteo" id="cli-conteo"></div>
+          <button type="button" class="btn-sec" id="cli-csv" title="Descarga todos los clientes filtrados (se abre en Excel)">Exportar CSV</button>
+        </div>
+        <div class="tabla-wrap">
+          <table id="cli-tabla" class="t-sku t-cli"><thead></thead><tbody></tbody></table>
+        </div>
+        <div class="paginacion" id="cli-pag"></div>
+      </div>
+      <div id="cli-ficha" hidden>
+        <div class="ficha-cab">
+          <button type="button" class="btn-sec" id="cli-volver">← Todos los clientes</button>
+          <h2 id="cli-nombre"></h2>
+        </div>
+        <div class="notas" id="cli-notas" hidden></div>
+        <div class="barra-tabla">
+          <div class="conteo" id="cs-conteo"></div>
+          <button type="button" class="btn-sec" id="cs-csv" title="Descarga todo lo que compró el cliente (se abre en Excel)">Exportar CSV</button>
+        </div>
+        <div class="tabla-wrap">
+          <table id="cs-tabla" class="t-sku"><thead></thead><tbody></tbody></table>
+        </div>
+        <div class="paginacion" id="cs-pag"></div>
+      </div>
+    </div>
+
+    <!-- Vista 3: Resumen por línea → familia → marca -->
+    <div id="vista-resumen" hidden>
+      <section class="graf" id="graf" aria-label="Gráfico de monto por línea"></section>
+      <div class="barra-tabla">
+        <div class="grupo">
+          <button type="button" class="btn-sec" id="res-expandir">Expandir todo</button>
+          <button type="button" class="btn-sec" id="res-contraer">Contraer todo</button>
+        </div>
+        <button type="button" class="btn-sec" id="res-csv" title="Descarga el resumen por línea, familia y marca (se abre en Excel)">Exportar CSV</button>
+      </div>
+      <div class="tabla-wrap">
+        <table id="res-tabla" class="t-arbol"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+
+    <p class="nota" id="nota-pie"></p>
+  </div>
+</main>
+
+<div id="velo" hidden></div>
+<aside id="detalle" hidden aria-label="Detalle del SKU"></aside>
+<div id="tip" class="tip" role="status" hidden></div>
+
+<script src="js/util.js"></script>
+<script src="js/datos.js"></script>
+<script src="js/tabla.js"></script>
+<script src="js/detalle.js"></script>
+<script src="js/explorador.js"></script>
+<script src="js/cliente.js"></script>
+<script src="js/resumen.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

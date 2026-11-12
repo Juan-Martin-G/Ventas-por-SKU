@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Ingreso — Ventas por SKU GEMCO</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/dist/email.min.js"></script>
+<style>
+:root{
+  --az:#2c5f7c; --az2:#1e3a4e; --pos:#4a9e8c; --neg:#d97b5f;
+  --brd:#e2e4e8; --gy:#f5f7fb; --gy2:#edf0f5; --wh:#fff;
+  --txt:#1a1a2e; --mut:#6b7280; --r:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gy);color:var(--txt);
+     font-size:13px;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+
+.card{background:var(--wh);border:1px solid var(--brd);border-radius:10px;
+  box-shadow:0 4px 24px rgba(26,26,46,.08);padding:32px 30px;width:100%;max-width:360px}
+
+.brand{text-align:center;margin-bottom:22px}
+.brand h1{font-size:17px;font-weight:700;color:var(--az2)}
+.brand p{font-size:11px;color:var(--mut);margin-top:4px}
+
+.step{display:none}
+.step.on{display:block}
+
+label{display:block;font-size:10px;font-weight:700;color:var(--mut);
+  text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+
+input{width:100%;border:1px solid var(--brd);border-radius:var(--r);padding:9px 11px;
+  font-size:16px;font-family:inherit;color:var(--txt);outline:none;transition:.12s}
+input:focus{border-color:var(--az)}
+input.code{letter-spacing:.3em;text-align:center;font-weight:600}
+
+.btn{width:100%;border:none;border-radius:var(--r);padding:10px 12px;font-size:13px;
+  font-weight:700;font-family:inherit;cursor:pointer;transition:.12s;margin-top:14px}
+.btn-primary{background:var(--az);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--az2)}
+.btn-primary:disabled{background:#b7c3cc;cursor:default}
+
+.btn-link{background:none;border:none;color:var(--az);font-size:11px;font-weight:600;
+  font-family:inherit;cursor:pointer;padding:0;text-decoration:underline}
+.btn-link:disabled{color:var(--mut);cursor:default;text-decoration:none}
+
+.row-links{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+
+.msg{font-size:11.5px;border-radius:var(--r);padding:8px 10px;margin-top:12px;line-height:1.4}
+.msg.err{background:#fbeae4;color:#a8452a}
+.msg.ok{background:#eaf5f2;color:#2c7a63}
+.msg.hidden{display:none}
+
+.email-echo{font-size:11px;color:var(--mut);margin-bottom:14px}
+.email-echo b{color:var(--txt)}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="brand">
+    <h1>Ventas por SKU · GEMCO</h1>
+    <p>Acceso restringido · ingresa con tu correo autorizado</p>
+  </div>
+
+  <!-- ── PASO 1: CORREO ────────────────────────────────────────── -->
+  <div class="step on" id="step1">
+    <label for="in-email">Correo</label>
+    <input id="in-email" type="email" placeholder="nombre@empresa.cl" autocomplete="email">
+    <button class="btn btn-primary" id="btn-enviar">Enviar código</button>
+    <div class="msg hidden" id="msg1"></div>
+  </div>
+
+  <!-- ── PASO 2: CÓDIGO ────────────────────────────────────────── -->
+  <div class="step" id="step2">
+    <div class="email-echo">Código enviado a <b id="email-echo-txt"></b></div>
+    <label for="in-code">Código de 6 dígitos</label>
+    <input id="in-code" class="code" type="text" inputmode="numeric" maxlength="6" placeholder="······" autocomplete="one-time-code">
+    <button class="btn btn-primary" id="btn-ingresar">Ingresar</button>
+    <div class="row-links">
+      <button class="btn-link" id="btn-volver">Volver a ingresar correo</button>
+      <button class="btn-link" id="btn-reenviar">Reenviar código</button>
+    </div>
+    <div class="msg hidden" id="msg2"></div>
+  </div>
+</div>
+
+<script>
+// Mismo esquema de acceso que el panel EERR-GEMCO: código de 6 dígitos por correo (EmailJS).
+// Las claves de sesión usan el prefijo "vsku_" para no mezclarse con las del panel EERR.
+// ═══════════════════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════════════════
+const EMAILJS_PUBLIC_KEY = 'WGQ-1DDAFGlYSy2Qv';
+const EMAILJS_SERVICE_ID = 'service_l9u0laa';
+const EMAILJS_TEMPLATE_ID = 'template_buuarj5';
+const COOLDOWN_SEC = 45;
+const EXP_MS = 15 * 60 * 1000;
+const PANEL = 'panel.html';
+
+const AUTHORIZED_EMAILS = [
+  'juanmartin.brante@gemco.cl',
+  'cristobal.munoz@aspencapital.cl',
+  'cristian.valenzuela@aspencapital.cl',
+  'marcelo.ruminot@gemco.cl',
+];
+
+emailjs.init(EMAILJS_PUBLIC_KEY);
+
+// ═══════════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function normEmail(e) { return String(e || '').trim().toLowerCase(); }
+function esAutorizado(e) { return AUTHORIZED_EMAILS.includes(normEmail(e)); }
+function genCodigo() {
+  const n = new Uint32Array(1);
+  crypto.getRandomValues(n);
+  return String(100000 + (n[0] % 900000));
+}
+
+function showMsg(el, text, tipo) {
+  el.textContent = text;
+  el.className = 'msg ' + tipo;
+}
+function hideMsg(el) { el.className = 'msg hidden'; }
+
+function irAPaso1() {
+  document.getElementById('step1').classList.add('on');
+  document.getElementById('step2').classList.remove('on');
+  hideMsg(document.getElementById('msg2'));
+}
+function irAPaso2(email) {
+  document.getElementById('email-echo-txt').textContent = email;
+  document.getElementById('step1').classList.remove('on');
+  document.getElementById('step2').classList.add('on');
+  document.getElementById('in-code').value = '';
+  hideMsg(document.getElementById('msg1'));
+  document.getElementById('in-code').focus();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SI YA HAY SESIÓN ACTIVA, IR DIRECTO AL PANEL
+// ═══════════════════════════════════════════════════════════════════
+if (sessionStorage.getItem('vsku_auth') === 'true') {
+  window.location.href = PANEL;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  ENVÍO DE CÓDIGO
+// ═══════════════════════════════════════════════════════════════════
+function enviarCodigo() {
+  const msg1 = document.getElementById('msg1');
+  const email = document.getElementById('in-email').value;
+
+  if (!esAutorizado(email)) {
+    showMsg(msg1, 'Correo no autorizado.', 'err');
+    return;
+  }
+
+  const emailNorm = normEmail(email);
+  const codigo = genCodigo();
+  const btn = document.getElementById('btn-enviar');
+  btn.disabled = true;
+  hideMsg(msg1);
+
+  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    to_email: emailNorm,
+    codigo: codigo,
+  }).then(() => {
+    sessionStorage.setItem('vsku_pending_email', emailNorm);
+    sessionStorage.setItem('vsku_pending_code', codigo);
+    sessionStorage.setItem('vsku_pending_exp', String(Date.now() + EXP_MS));
+    btn.disabled = false;
+    irAPaso2(emailNorm);
+    showMsg(document.getElementById('msg2'), 'Código enviado a tu correo, revisa tu bandeja de entrada.', 'ok');
+    iniciarCooldown();
+  }).catch(() => {
+    btn.disabled = false;
+    showMsg(msg1, 'No se pudo enviar el código. Intenta nuevamente.', 'err');
+  });
+}
+
+function reenviarCodigo() {
+  const email = sessionStorage.getItem('vsku_pending_email');
+  if (!email) { irAPaso1(); return; }
+
+  const codigo = genCodigo();
+  const btn = document.getElementById('btn-reenviar');
+  const msg2 = document.getElementById('msg2');
+  btn.disabled = true;
+
+  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    to_email: email,
+    codigo: codigo,
+  }).then(() => {
+    sessionStorage.setItem('vsku_pending_code', codigo);
+    sessionStorage.setItem('vsku_pending_exp', String(Date.now() + EXP_MS));
+    showMsg(msg2, 'Código reenviado a tu correo.', 'ok');
+    iniciarCooldown();
+  }).catch(() => {
+    showMsg(msg2, 'No se pudo reenviar el código. Intenta nuevamente.', 'err');
+    btn.disabled = false;
+  });
+}
+
+let cooldownTimer = null;
+function iniciarCooldown() {
+  const btn = document.getElementById('btn-reenviar');
+  let restante = COOLDOWN_SEC;
+  btn.disabled = true;
+  btn.textContent = `Reenviar código (${restante}s)`;
+  clearInterval(cooldownTimer);
+  cooldownTimer = setInterval(() => {
+    restante -= 1;
+    if (restante <= 0) {
+      clearInterval(cooldownTimer);
+      btn.disabled = false;
+      btn.textContent = 'Reenviar código';
+    } else {
+      btn.textContent = `Reenviar código (${restante}s)`;
+    }
+  }, 1000);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  VERIFICACIÓN DE CÓDIGO
+// ═══════════════════════════════════════════════════════════════════
+function limpiarPendiente() {
+  sessionStorage.removeItem('vsku_pending_email');
+  sessionStorage.removeItem('vsku_pending_code');
+  sessionStorage.removeItem('vsku_pending_exp');
+}
+
+function verificarCodigo() {
+  const msg2 = document.getElementById('msg2');
+  const ingresado = document.getElementById('in-code').value.trim();
+  const codigo = sessionStorage.getItem('vsku_pending_code');
+  const email = sessionStorage.getItem('vsku_pending_email');
+  const exp = Number(sessionStorage.getItem('vsku_pending_exp') || 0);
+
+  if (!codigo || !email) {
+    showMsg(document.getElementById('msg1'), 'Solicita un nuevo código.', 'err');
+    irAPaso1();
+    return;
+  }
+
+  if (Date.now() > exp) {
+    showMsg(document.getElementById('msg1'), 'El código expiró. Solicita uno nuevo.', 'err');
+    limpiarPendiente();
+    irAPaso1();
+    return;
+  }
+
+  if (ingresado !== codigo) {
+    showMsg(msg2, 'Código incorrecto.', 'err');
+    return;
+  }
+
+  sessionStorage.setItem('vsku_auth', 'true');
+  sessionStorage.setItem('vsku_auth_email', email);
+  limpiarPendiente();
+  window.location.href = PANEL;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  EVENTOS
+// ═══════════════════════════════════════════════════════════════════
+document.getElementById('btn-enviar').addEventListener('click', enviarCodigo);
+document.getElementById('btn-ingresar').addEventListener('click', verificarCodigo);
+document.getElementById('btn-volver').addEventListener('click', irAPaso1);
+document.getElementById('btn-reenviar').addEventListener('click', reenviarCodigo);
+document.getElementById('in-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') enviarCodigo();
+});
+document.getElementById('in-code').addEventListener('keydown', e => {
+  if (e.key === 'Enter') verificarCodigo();
+});
+</script>
+</body>
+</html>

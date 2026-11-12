@@ -1,0 +1,16 @@
+# El Excel fuente nunca se sube
+*.xlsx
+*.xls
+~$*
+
+# Estado local de exportar.py (totales de la última exportación)
+scripts/ultima_exportacion.json
+
+# Secretos, por si más adelante se agrega cifrado
+.env
+.env.*
+*.key
+
+# Python
+__pycache__/
+*.pyc

@@ -3,6 +3,13 @@
 *.xls
 ~$*
 
+# Presentaciones de PowerPoint (nunca se suben)
+*.pptx
+*.ppt
+
+# Archivos para presentaciones (Top por línea, etc.): solo locales
+presentaciones/
+
 # Estado local de exportar.py (totales de la última exportación)
 scripts/ultima_exportacion.json
 

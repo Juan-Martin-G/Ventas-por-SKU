@@ -34,6 +34,7 @@ if (sessionStorage.getItem('vsku_auth') !== 'true') {
   <button type="button" data-vista="explorador" class="on" aria-current="page">Explorador por SKU</button>
   <button type="button" data-vista="cliente">Por cliente</button>
   <button type="button" data-vista="resumen">Resumen por línea</button>
+  <button type="button" data-vista="analisis">Análisis</button>
 </nav>
 
 <section class="filtros" id="filtros" hidden aria-label="Filtros">
@@ -121,6 +122,9 @@ if (sessionStorage.getItem('vsku_auth') !== 'true') {
       </div>
     </div>
 
+    <!-- Vista 4: Análisis (gráficos; Chart.js se carga solo al abrirla) -->
+    <div id="vista-analisis" hidden></div>
+
     <p class="nota" id="nota-pie"></p>
   </div>
 </main>
@@ -136,6 +140,8 @@ if (sessionStorage.getItem('vsku_auth') !== 'true') {
 <script src="js/explorador.js"></script>
 <script src="js/cliente.js"></script>
 <script src="js/resumen.js"></script>
+<script src="js/rankings.js"></script>
+<script src="js/analisis.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

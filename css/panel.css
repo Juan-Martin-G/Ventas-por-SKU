@@ -1,4 +1,4 @@
-/* Panel Ventas por SKU – GEMCO. Misma paleta que el panel EERR. */
+﻿/* Panel Ventas por SKU – GEMCO. Misma paleta que el panel EERR. */
 :root{
   --az:#2c5f7c; --az2:#1e3a4e; --az-s:#e8f0f4;
   --brd:#e2e4e8; --gy:#f5f7fb; --gy2:#edf0f5; --wh:#fff;
@@ -208,6 +208,53 @@ button.tog:hover{background:var(--gy2)}
 .tip-var{border-top:1px solid var(--gy2);padding-top:4px;margin-top:4px !important;color:var(--mut)}
 .tip-var span{color:var(--txt)}
 
+/* ── Vista Análisis ───────────────────────────────────────── */
+.an-controles{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin-bottom:12px}
+.an-ctl{display:inline-flex;align-items:center;gap:7px;font-weight:600;color:var(--az2)}
+.an-ctl select{border:1px solid var(--brd);border-radius:var(--r);padding:6px 9px;height:32px;background:var(--wh);font-weight:400;color:var(--txt);max-width:220px}
+.an-aviso{font-size:11.5px;line-height:1.45;color:#5c4a1c;background:var(--glosa);border:1px solid var(--glosa-b);border-radius:var(--r);padding:7px 11px;margin-bottom:12px}
+.an-card{background:var(--wh);border:1px solid var(--brd);border-radius:8px;padding:12px 16px 14px;margin-bottom:14px;min-width:0}
+.an-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.an-cab h2{font-size:14px;color:var(--az2)}
+.an-sub{font-size:11.5px;color:var(--mut);margin-top:2px;line-height:1.4}
+.an-acc{display:flex;gap:6px;flex:none}
+.an-dos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.an-dos > :only-child{grid-column:1 / -1}
+.an-lienzo{position:relative;height:440px;min-width:0}
+.an-lienzo.top10{height:540px}
+.an-lienzo.mini{height:250px}
+.an-lienzo.pareto{height:340px}
+.an-tablas{margin-top:12px}
+.an-tabla{min-width:0;overflow-x:auto}
+.an-tabla h3{font-size:12.5px;color:var(--az2);margin-bottom:4px}
+.an-tabla-wrap{overflow-x:auto}
+.an-t{font-size:12px}
+.an-t th{background:var(--gy2);color:var(--az2);font-weight:700;padding:6px 8px;font-size:11.5px}
+.an-t td{padding:5px 8px}
+.an-t tbody tr[data-id]{cursor:pointer}
+.an-t tbody tr[data-id]:hover td{background:var(--az-s)}
+.an-t td.an-nom{max-width:0;width:100%;overflow:hidden;text-overflow:ellipsis}
+.an-t td i,.an-leyenda-anios i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.an-t tr.an-resto td{color:var(--mut)}
+.an-t tr.an-resto td:nth-child(2),.an-t tr.total td:nth-child(2){white-space:normal}
+.an-conc th.grp{text-align:center;border-left:1px solid var(--brd)}
+.an-conc td:first-child{min-width:150px}
+.an-grilla{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.an-mini{border:1px solid var(--gy2);border-radius:6px;padding:8px 8px 4px;min-width:0}
+.an-mini-cab{all:unset;box-sizing:border-box;cursor:pointer;display:flex;justify-content:space-between;align-items:baseline;gap:6px;width:100%;padding:2px 2px 6px}
+.an-mini-cab b{color:var(--az);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.an-mini-cab span{color:var(--mut);font-size:11px;white-space:nowrap}
+.an-mini-cab:hover b{text-decoration:underline}
+.an-mini-cab:focus-visible{outline:2px solid var(--az);outline-offset:1px}
+.an-leyenda-anios{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11.5px;color:var(--txt);margin-top:10px}
+.an-ind{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.an-ind-a{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;background:var(--gy);border:1px solid var(--brd);border-radius:6px;padding:7px 12px;font-size:12px}
+.an-ind-a b{border-left:3px solid;padding-left:6px;color:var(--az2)}
+.an-ind-a strong{color:var(--az2);font-variant-numeric:tabular-nums}
+.an-vacio{color:var(--mut);padding:18px 4px}
+.an-notas{margin-top:4px}
+@media (max-width:1100px){.an-grilla{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 /* ── Celular ──────────────────────────────────────────────── */
 @media (max-width:760px){
   .top{padding:10px 12px}
@@ -251,4 +298,14 @@ button.tog:hover{background:var(--gy2)}
   .graf{padding:10px 10px 8px}
   .g-fila,.g-eje{grid-template-columns:104px 1fr;column-gap:8px}
   .g-rot{font-size:11.5px}
+  .an-dos,.an-grilla{grid-template-columns:1fr}
+  .an-cab{flex-direction:column}
+  .an-card{padding:10px 10px 12px}
+  .an-t td.an-nom{min-width:110px}
+  .an-t th,.an-t td{padding-left:6px;padding-right:6px}
+  .an-lienzo{height:400px}
+  .an-lienzo.top10{height:520px}
+  .an-ctl select{font-size:16px;height:38px;max-width:none}
+  .an-controles .an-ctl:first-child{flex:1 1 100%}
+  .an-controles .an-ctl:first-child select{flex:1}
 }

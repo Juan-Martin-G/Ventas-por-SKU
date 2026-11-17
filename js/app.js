@@ -11,7 +11,7 @@
     { id: 'marca', campo: 'k', dic: 'marca', todas: 'Todas las marcas' },
     { id: 'origen', campo: 'o', dic: 'origen', todas: 'Todos los orígenes' },
   ];
-  const VISTAS = { explorador: VS.explorador, cliente: VS.cliente, resumen: VS.resumen };
+  const VISTAS = { explorador: VS.explorador, cliente: VS.cliente, resumen: VS.resumen, analisis: VS.analisis };
 
   // Los filtros guardan índices de diccionario (null = sin filtro).
   const est = VS.estado = { q: '', terminos: [], anio: 0, linea: null, familia: null, marca: null,

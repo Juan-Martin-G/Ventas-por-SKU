@@ -20,7 +20,9 @@ Panel web interactivo para explorar la venta real de GEMCO 2025–2026 por SKU: 
 - Referencia del corte 06-11-2026 (tras borrar en `TGlosas` las filas SERV-GLOSA de los folios 1654, 41136 y 41659): 2025 = 9.726.505.767 y 120.125 unidades; 2026 = 7.730.447.753 y 81.084 unidades.
 
 ## Pipeline
-1. `scripts/exportar.py`: lee la Base dinamica → valida (sin filas vacías, sin errores `#`, montos por año contra el reporte del Excel) → genera `data/ventas.json` compacto (columnas con diccionarios para textos repetidos: SKU, cliente, familia, línea, marca, descripción, etc.). Si algo no cuadra, no genera nada.
+1. `scripts/exportar.py`: lee la Base dinamica → valida (sin filas vacías, sin errores `#`, montos por año contra el reporte del Excel) → unifica nombres de clientes con `scripts/clientes_alias.csv` → genera `data/ventas.json` compacto (columnas con diccionarios para textos repetidos: SKU, cliente, familia, línea, marca, descripción, etc.). Si algo no cuadra, no genera nada.
+   - **`scripts/clientes_alias.csv`** (`alias;nombre_oficial`, separador `;`): equivalencias de nombres de un mismo cliente. Solo cambia nombres, nunca montos. Si el archivo está mal armado (alias repetido con dos nombres, alias en cadena) la exportación se detiene. El resumen de validación lista además los **posibles duplicados** (mismo nombre sin tildes, puntos, espacios ni S.A./SPA/LTDA, o muy parecidos): no se agregan solos, los confirma el usuario.
+   - Criterio acordado (12-11-2026): se unifican sin preguntar los nombres que solo difieren en tildes, puntos, guiones, mayúsculas, espacios, «DE»/«DEL», «DR.»/«DR», «S.A.»/«SA» o «SPA»/«S.P.A.»; **nombre oficial = el de mayor facturación** (excepción indicada por el usuario: HOSPITAL ROBERTO DEL RIO). Los dudosos (otro tipo de sociedad, abreviaturas como HOSP/FUND/DOCTOR, hospital vs. servicio de salud, erratas) **no** se unifican: se le muestran al usuario. ISM: «INSUMOS Y SERVICIOS MEDICOS S.A.» y «S.P.A.» se unificaron por indicación del usuario.
 2. El sitio es estático (HTML + JS, sin backend) y carga `data/ventas.json` directamente, **sin cifrado por ahora**.
 3. Cada actualización: reemplazar el Excel, correr `python scripts/exportar.py`, revisar el resumen de validación, publicar.
 
@@ -30,13 +32,16 @@ Panel web interactivo para explorar la venta real de GEMCO 2025–2026 por SKU: 
 - `js/util.js`: formatos es-CL, orden, sumas, CSV. `js/datos.js`: sesión, carga y preparación de datos, agrupación por SKU.
 - `js/tabla.js`: tabla genérica (orden, paginación, filas fijas, CSV) y columnas compartidas.
 - `js/detalle.js`: panel lateral con el detalle de un SKU (se abre desde cualquier vista con `#sku=CÓDIGO`).
-- `js/explorador.js`, `js/cliente.js`, `js/resumen.js`: una por vista. `js/app.js`: filtros globales, indicadores y arranque.
+- `js/explorador.js`, `js/cliente.js`, `js/resumen.js`, `js/analisis.js`: una por vista. `js/app.js`: filtros globales, indicadores y arranque.
+- `js/rankings.js`: **única** lógica de rankings de la pestaña Análisis (mismos criterios que las láminas `presentaciones/top_por_linea_v2.py` / `v3.py`: filtro de producto tangible, clientes con todo lo facturado, ranking propio por año). Si cambia un criterio en las láminas, se cambia aquí y se vuelve a correr la prueba.
+- Prueba: `python scripts/probar_rankings.py` (usa `scripts/rankings_cli.js` con Node) compara al peso los top 10 y la concentración de las 8 líneas contra `presentaciones/Top_por_linea_v2.xlsx` / `v3.xlsx`; deben ser de la misma exportación que `data/ventas.json`.
 - `data/ventas.json`: lo genera `exportar.py`. `robots.txt`: bloquea todo.
 
 ## Vistas
 1. **Explorador por SKU** (vista principal): tabla con SKU, descripción, familia, línea, marca, unidades y monto 2025 y 2026, variación. Búsqueda por texto, orden por columna, paginación. Clic en un SKU → detalle: clientes que lo compraron (unidades y monto por año) y origen (venta / arriendo / glosa detallada).
 2. **Por cliente**: buscar un cliente → qué compró (SKU, unidades, monto por año).
 3. **Resumen por línea → familia → marca**: tabla jerárquica expandible con unidades y montos por año.
+4. **Análisis** (12-11-2026): controles Línea (una de las 8 o «Todas»; es el mismo filtro global de línea), Dimensión (SKU / Familia / Cliente / Marca) y Top (5 / 10). Secciones: 1 descomposición del top (dos columnas al 100%, 2025 y 2026, paleta por posición de las láminas) con tabla; 2 cuadrícula de las 8 líneas (cuando Línea = Todas); 3 Pareto; 4 variación (10 alzas y 10 bajas en MM$); 5 mix por línea (peso de cada línea y split producto tangible / servicios / arriendos / glosas sin detalle); 6 tabla de concentración top 5 / top 10 de SKU, familias y clientes. Chart.js 4.4.1 desde jsDelivr con integridad SRI, cargado solo al abrir la pestaña. El año global elige qué años se ven; familia, marca, origen, cliente, búsqueda y glosas se aplican con un aviso (las cifras dejan de ser las de las láminas). Clic: SKU → detalle; cliente → su ficha; familia/marca → Explorador filtrado. Cada gráfico descarga PNG y CSV.
 - Filtros globales: año, línea, familia, marca, origen, cliente, y un interruptor “incluir glosas sin detalle”.
 - Exportar lo que esté filtrado: CSV con separador ; y coma decimal (se abre directo en Excel). Por ahora no hay .xlsx.
 - En las tres vistas la glosa sin detalle va aparte y rotulada: fila fija arriba en las tablas de SKU y nodo propio bajo cada línea en el resumen.
@@ -58,7 +63,16 @@ Panel web interactivo para explorar la venta real de GEMCO 2025–2026 por SKU: 
 - **Limitación conocida**: mientras no haya cifrado, el login es solo una barrera de entrada en el navegador; quien conozca la URL de `data/ventas.json` puede descargarlo sin pasar por el login. Los datos incluyen nombres de clientes y montos.
 - **La carga de datos vive en una sola función**: `VS.cargarDatos()` en `js/datos.js`. Nadie más hace `fetch` de los datos. Para endurecer (cifrado, backend, etc.) se reemplaza solo esa función.
 - **Login**: mismo esquema del repo `Juan-Martin-G/EERR-GEMCO` (GitHub Pages, código de 6 dígitos por correo con EmailJS, lista de correos autorizados en `index.html`). El panel **no carga `ventas.json` hasta que el usuario valide el código**.
-- **Publicación**: repo **`Ventas-por-SKU`** en la cuenta de GitHub **Juan-Martin-G** (la misma del panel EERR-GEMCO; decisión del 11-11-2026, reemplaza a Gemco-DN), con GitHub Pages desde `main`, carpeta raíz. Commits con el nombre y correo personal del usuario. **No publicar hasta que yo lo pida.**
+- **Publicación**: publicado en el repo público **`Juan-Martin-G/Ventas-por-SKU`** (https://github.com/Juan-Martin-G/Ventas-por-SKU), cuenta de GitHub **Juan-Martin-G** (la misma del panel EERR-GEMCO; decisión del 11-11-2026, reemplaza a Gemco-DN), con GitHub Pages desde `main`, carpeta raíz: **https://juan-martin-g.github.io/Ventas-por-SKU/**. Commits con el nombre y correo personal del usuario (Juan-Martin-B). **No publicar cambios hasta que yo lo pida.**
+  - Git: la carpeta tiene un archivo `.git` que apunta al repositorio real en `C:\Users\Juan Martin Brante\git-repos\Ventas-por-SKU.git` (fuera de SharePoint, para que el historial no se sincronice). Desde esta carpeta `git add/commit/push` funcionan normal; el push usa la sesión de `gh` (cuenta Juan-Martin-G).
+  - **Actualizar los datos publicados**:
+    1. Reemplazar el Excel `AAAAMMDD Ventas por SKU.xlsx` (guardado después de recalcular).
+    2. `python scripts/exportar.py` y revisar el resumen de validación (si no cuadra, no genera nada: no publicar).
+    3. `git add data/ventas.json`
+    4. `git commit -m "Datos al dd-mm-aaaa"`
+    5. `git push`
+    6. GitHub Pages se reconstruye solo en 1–2 minutos; recargar el panel (Ctrl+F5) y revisar la fecha “Datos al …”.
+  - Antes de cada push, `git status` no debe mostrar ningún `.xlsx`, `.pptx`, `presentaciones/` ni `scripts/ultima_exportacion.json` (los excluye `.gitignore`).
 - **No indexar**: todas las páginas llevan `<meta name="robots" content="noindex, nofollow">` y hay un `robots.txt` que bloquea todo.
 - **El Excel nunca se sube**: `.gitignore` excluye `*.xlsx`. `data/ventas.json` sí se publica.
 

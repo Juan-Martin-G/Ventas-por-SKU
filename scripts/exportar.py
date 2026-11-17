@@ -12,16 +12,23 @@ Pasos:
        Si no cuadran, se detiene.
      - Unidades: no tienen control fijo. Se muestran junto a la diferencia contra
        la exportación anterior; si cambian, avisa pero no se detiene.
-  3. Si todo cuadra, escribe data/ventas.json (el archivo que carga el panel) y
+  3. Unifica nombres de clientes con scripts/clientes_alias.csv (alias;nombre_oficial)
+     e informa otros posibles duplicados (nombres iguales sin tildes, puntos, espacios
+     ni S.A./SPA/LTDA, o muy parecidos) para revisarlos.
+  4. Si todo cuadra, escribe data/ventas.json (el archivo que carga el panel) y
      guarda los totales en scripts/ultima_exportacion.json (local, no se publica).
 
 No corrige ni redondea montos: si algo no cuadra, se detiene y avisa.
 """
 import argparse
+import csv
 import datetime as dt
+import difflib
 import json
 import math
+import re
 import sys
+import unicodedata
 from collections import defaultdict
 from pathlib import Path
 
@@ -37,6 +44,9 @@ ROTULO_CORTE = "Fecha última revisión"  # la fecha está en la celda a su dere
 ROTULOS_MONTO = ("Monto {anio} del reporte", "Monto {anio}")
 TOLERANCIA_MONTO = 0.5  # pesos: la base y el reporte deben cuadrar al peso
 ESTADO = BASE / "scripts" / "ultima_exportacion.json"  # totales de la última exportación (local)
+ALIAS_CLIENTES = BASE / "scripts" / "clientes_alias.csv"  # alias;nombre_oficial (unifica clientes)
+SUFIJOS_SOCIEDAD = {"SA", "SPA", "LTDA", "LIMITADA", "EIRL", "CIA"}  # se ignoran al buscar duplicados
+SIMILITUD_DUPLICADO = 0.93  # nombres normalizados con similitud >= a esto se informan como posibles duplicados
 TIPO_GLOSA = "Glosa"  # glosas sin detalle: se identifican solo por el Tipo
 TIPO_DETALLE = "Detalle glosa"
 PREFIJOS_SKU_GLOSA = ("SERV-GLOSA", "SERV_GLOSA")  # un detalle de glosa no debería traer estos SKU
@@ -260,6 +270,90 @@ def validar(crudas, errores, avisos):
     return filas
 
 
+def leer_alias(errores):
+    """{alias: nombre_oficial} desde scripts/clientes_alias.csv. Errores si el archivo está mal armado."""
+    if not ALIAS_CLIENTES.is_file():
+        return {}
+    mapa = {}
+    with ALIAS_CLIENTES.open(encoding="utf-8-sig", newline="") as f:
+        lector = csv.reader(f, delimiter=";")
+        enc = next(lector, None)
+        if [texto(x).lower() for x in (enc or [])][:2] != ["alias", "nombre_oficial"]:
+            errores.append(f"{ALIAS_CLIENTES.name}: el encabezado debe ser 'alias;nombre_oficial'.")
+            return {}
+        for n, fila in enumerate(lector, 2):
+            if not fila or all(vacio(x) for x in fila):
+                continue
+            if len(fila) < 2 or vacio(fila[0]) or vacio(fila[1]):
+                errores.append(f"{ALIAS_CLIENTES.name}, línea {n}: falta el alias o el nombre oficial.")
+                continue
+            alias, oficial = texto(fila[0]), texto(fila[1])
+            if alias == oficial:
+                errores.append(f"{ALIAS_CLIENTES.name}, línea {n}: alias igual al nombre oficial ('{alias}').")
+            elif alias in mapa and mapa[alias] != oficial:
+                errores.append(f"{ALIAS_CLIENTES.name}, línea {n}: el alias '{alias}' aparece con dos nombres oficiales.")
+            mapa[alias] = oficial
+    for alias, oficial in mapa.items():
+        if oficial in mapa:
+            errores.append(f"{ALIAS_CLIENTES.name}: '{oficial}' es nombre oficial de '{alias}' y a la vez alias "
+                           f"de '{mapa[oficial]}'. Apunta el alias directo al nombre final.")
+    return mapa
+
+
+def unificar_clientes(filas, mapa, avisos, anios):
+    """Reemplaza alias por el nombre oficial en las filas. Los montos no cambian."""
+    if not mapa:
+        return
+    print(f"  CLIENTES UNIFICADOS  ({ALIAS_CLIENTES.relative_to(BASE).as_posix()})")
+    nombres = {d["Cliente"] for d in filas}
+    por_alias = defaultdict(list)
+    for d in filas:
+        if d["Cliente"] in mapa:
+            por_alias[d["Cliente"]].append(d)
+            d["Cliente"] = mapa[d["Cliente"]]
+    for alias, oficial in mapa.items():
+        ds = por_alias.get(alias, [])
+        if not ds:
+            avisos.append(f"Alias de cliente sin filas en la base: '{alias}' (revisar {ALIAS_CLIENTES.name}).")
+        if oficial not in nombres:
+            avisos.append(f"El nombre oficial '{oficial}' no existe en la base: el alias '{alias}' queda con un nombre nuevo.")
+        print(f"  {alias}  →  {oficial}   ({miles(len(ds))} filas; monto "
+              + ", ".join(f"{a}: {miles(math.fsum(d['Monto'] for d in ds if d['Año'] == a))}" for a in anios) + ")")
+    print()
+
+
+def norm_cliente(nombre):
+    """Nombre sin tildes, puntos, espacios ni tipo de sociedad: para detectar duplicados."""
+    s = unicodedata.normalize("NFKD", nombre.upper())
+    s = "".join(c for c in s if not unicodedata.combining(c)).replace(".", "")
+    tokens = [t for t in re.split(r"[^A-Z0-9Ñ]+", s) if t and t not in SUFIJOS_SOCIEDAD]
+    return "".join(tokens)
+
+
+def posibles_duplicados(filas):
+    """Grupos de nombres de cliente que parecen el mismo: (iguales normalizados, muy parecidos)."""
+    monto = defaultdict(list)
+    for d in filas:
+        monto[d["Cliente"]].append(d["Monto"])
+    nombres = sorted(n for n in monto if n)
+    grupos = defaultdict(list)
+    for n in nombres:
+        grupos[norm_cliente(n)].append(n)
+    iguales = [g for g in grupos.values() if len(g) > 1]
+    claves = sorted(k for k in grupos if k)
+    parecidos = []
+    for i, a in enumerate(claves):
+        for b in claves[i + 1:]:
+            if abs(len(a) - len(b)) > 4:
+                continue
+            sm = difflib.SequenceMatcher(None, a, b)
+            if sm.real_quick_ratio() >= SIMILITUD_DUPLICADO and sm.quick_ratio() >= SIMILITUD_DUPLICADO \
+                    and sm.ratio() >= SIMILITUD_DUPLICADO:
+                parecidos.append(sorted(grupos[a] + grupos[b]))
+    total = {n: math.fsum(v) for n, v in monto.items()}
+    return iguales, parecidos, total
+
+
 def agrupar(filas, clave):
     """{valor: {año: [monto, unidades, n_filas]}} con sumas exactas (fsum)."""
     acum = defaultdict(lambda: defaultdict(lambda: ([], [])))
@@ -401,6 +495,22 @@ def main():
         print(f"  {a:<6} {unid(u):>12} {unid(pa['unidades']):>12} "
               f"{(('+' if du > 0 else '') + unid(du)) if cambio else '0':>10} {miles(n):>8} {miles(pa.get('filas', 0)):>11}")
     print()
+
+    # --- Clientes: unificación por alias y posibles duplicados --------------------
+    alias = leer_alias(errores)
+    if filas:
+        unificar_clientes(filas, alias, avisos, anios)
+        iguales, parecidos, total_cli = posibles_duplicados(filas)
+        print("  POSIBLES DUPLICADOS DE CLIENTES  (revisar; si corresponden, agregarlos a clientes_alias.csv)")
+        if not iguales and not parecidos:
+            print("  (ninguno)")
+        for titulo, grupos in (("Iguales sin tildes, puntos, espacios ni S.A./SPA/LTDA", iguales),
+                               (f"Muy parecidos (similitud ≥ {SIMILITUD_DUPLICADO:.0%})", parecidos)):
+            if grupos:
+                print(f"  {titulo}:")
+                for g in grupos:
+                    print("    " + "  |  ".join(f"{n} ({miles(total_cli[n])})" for n in g))
+        print()
 
     if filas:
         tabla("Línea", agrupar(filas, lambda d: d["Línea"]), anios)
